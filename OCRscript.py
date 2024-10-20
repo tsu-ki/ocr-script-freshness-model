@@ -1,19 +1,14 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-import subprocess
-import sys
 import re
 from collections import Counter, defaultdict
-import requests
-import json
 from azure.ai.vision.imageanalysis import ImageAnalysisClient
 from azure.ai.vision.imageanalysis.models import VisualFeatures
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError
 from transformers import AutoTokenizer, AutoModel
-
+import logging
 
 # def install_packages():
 #     packages = ["paddlepaddle", "paddleocr", "fuzzywuzzy", "python-Levenshtein", "easyocr", "dateparser", "transformers", "albumentations"]
@@ -25,6 +20,13 @@ from fuzzywuzzy import fuzz
 import easyocr
 from paddleocr import PaddleOCR
 import dateparser
+
+import base64
+
+def convert_image_to_base64(image):
+    _, buffer = cv2.imencode('.jpg', image)  # Encode image as JPEG
+    image_base64 = base64.b64encode(buffer).decode('utf-8')  # Convert to base64 string
+    return image_base64
 
 product_categories = {
     'dairy': ['Ghee'],
@@ -140,6 +142,8 @@ class TextExtractor:
             return []
 
     def extract_text_paddle(self, image):
+        if not image.flags['C_CONTIGUOUS']:
+            image = np.ascontiguousarray(image)
         result = self.paddle_ocr.ocr(image, cls=True)
         extracted_text = []
         if result is not None:
@@ -444,6 +448,8 @@ class ProductInfoExtractor:
 class ImageProcessor:
     @staticmethod
     def preprocess_image(image):
+        if not image.flags['C_CONTIGUOUS']:
+            image = np.ascontiguousarray(image)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         denoised = cv2.fastNlMeansDenoising(gray)
         sharpened = cv2.filter2D(denoised, -1, np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]))
@@ -494,9 +500,11 @@ class ImprovedComprehensiveImageAnalyzer:
             size_groups = self.text_extractor.extract_all_text(img_version)
             for texts in size_groups.values():
                 all_text.update(texts)
-
+        logging.info(f"Extracted text: {all_text}")
         _, buffer = cv2.imencode('.jpg', image)
         image_bytes = buffer.tobytes()
+
+        logging.info("Analyzing image with Azure AI vision")
         azure_result = self.azure_client.analyze(
             image_data=image_bytes,
             visual_features=[VisualFeatures.CAPTION, VisualFeatures.READ],
@@ -507,20 +515,22 @@ class ImprovedComprehensiveImageAnalyzer:
             for block in azure_result.read.blocks:
                 for line in block.lines:
                     all_text.add(line.text)
-
+        
+        logging.info("Extracting product information from azure results")
         product_info = self.structure_text_with_models(list(all_text))
         product_info['all_text'] = list(all_text)
 
         if azure_result.caption:
             product_info['Package Description'] = azure_result.caption.text
             product_info['Confidence'] = azure_result.caption.confidence
-
+        
+        logging.info("Extracting dominant colors using Image Processor Module")
         outlined_image, _ = ImageProcessor.outline_color_changes(image)
         dominant_colors = ImageProcessor.extract_dominant_colors(image)
 
         return {
             'product_info': product_info,
-            'outlined_image': outlined_image,
+            'outlined_image': convert_image_to_base64(outlined_image),
             'dominant_colors': dominant_colors,
         }
 
@@ -541,6 +551,7 @@ class ImprovedComprehensiveImageAnalyzer:
             'all_text': ' '.join(text_list)
         }
 
+        logging.info("Extracting entities and classifying text using TinyBERT")
         for text in text_list:
 
             category = self.classify_text(text)
@@ -686,7 +697,7 @@ def process_images(folder_path, known_brands, product_categories, product_types,
 
             analysis_result = analyzer.analyze_image(image)
             analysis_result['filename'] = filename
-            analysis_result['original_image'] = image
+            analysis_result['original_image'] = convert_image_to_base64(image)  # Convert image to base64
             results.append(analysis_result)
 
     return results

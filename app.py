@@ -4,14 +4,40 @@ from flask_cors import CORS
 import io
 import base64
 from PIL import Image
-from werkzeug.utils import secure_filename
-from werkzeug.urls import url_quote
+# from werkzeug.utils import secure_filename
+# from werkzeug.urls import url_quote
 import numpy as np
 import cv2
 import logging
 import os
 from OCRscript import ImprovedComprehensiveImageAnalyzer
 # from improved_comprehensive_image_analyzer import ImprovedComprehensiveImageAnalyzer
+import base64
+import cv2
+import numpy as np
+
+def convert_image_to_base64(image):
+    """Convert an OpenCV image (ndarray) to a base64 string."""
+    _, buffer = cv2.imencode('.jpg', image)  # Encode image as JPEG
+    image_base64 = base64.b64encode(buffer).decode('utf-8')  # Convert to base64 string
+    return image_base64
+
+def ensure_json_serializable(data):
+    """
+    Recursively check a dictionary or list and convert non-serializable
+    objects like NumPy arrays to serializable formats (e.g., base64 for images).
+    """
+    if isinstance(data, dict):
+        # If data is a dictionary, check each key-value pair
+        for key, value in data.items():
+            data[key] = ensure_json_serializable(value)
+    elif isinstance(data, list):
+        # If data is a list, check each item
+        data = [ensure_json_serializable(item) for item in data]
+    elif isinstance(data, np.ndarray):
+        # If data is a NumPy array (likely an image), convert to base64
+        return convert_image_to_base64(data)
+    return data
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -72,15 +98,19 @@ analyzer = ImprovedComprehensiveImageAnalyzer(
     azure_key= azure_key,
     azure_endpoint= azure_endpoint
 )
+
 @app.route('/analyze', methods=['POST'])
 def analyze_image():
     try:
-        # Check if the image is sent as base64
-        if 'image' in request.json:
+        logging.info(f"Request Content-Type: {request.content_type}")
+        logging.info(f"Request files: {request.files}")
+        # Check if the image is sent as a base64 string in JSON
+        if request.content_type == 'application/json' and 'image' in request.json:
             base64_image = request.json['image']
+            logging.info(f"Received image file: {file.filename}")
             image_data = base64.b64decode(base64_image.split(',')[1])
             img = Image.open(io.BytesIO(image_data))
-        # Check if the image is sent as a file
+        # Check if the image is sent as a file (multipart/form-data)
         elif 'image' in request.files:
             file = request.files['image']
             img = Image.open(file.stream)
@@ -88,12 +118,17 @@ def analyze_image():
             return jsonify({'error': 'No image provided'}), 400
 
         # Convert PIL Image to OpenCV format
+        logging.info("Converting image to OpenCV format")
         img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
         # Analyze the image
+        logging.info("Analyzing image")
         result = analyzer.analyze_image(img_cv)
-
-        return jsonify(result)
+        
+        result_serializable = ensure_json_serializable(result)
+        
+        return jsonify(result_serializable)
+        # return jsonify(result)
 
     except Exception as e:
         logging.error(f"Error processing image: {str(e)}")
@@ -110,7 +145,7 @@ def run_app():
         # print(f"Public URL: {public_url}")
 
         # Run the app on all available interfaces
-        app.run(host='0.0.0.0', port=6000)
+        app.run(host='0.0.0.0', port=5000)
     except Exception as e:
         logging.error(f"Error starting the Flask app: {str(e)}")
 
