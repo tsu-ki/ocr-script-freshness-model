@@ -4,8 +4,8 @@ from flask_cors import CORS
 import io
 import base64
 from PIL import Image
-from werkzeug.utils import secure_filename
-from werkzeug.urls import url_quote
+# from werkzeug.utils import secure_filename
+# from werkzeug.urls import url_quote
 import numpy as np
 import cv2
 import logging
@@ -72,25 +72,32 @@ analyzer = ImprovedComprehensiveImageAnalyzer(
     azure_key= azure_key,
     azure_endpoint= azure_endpoint
 )
+
 @app.route('/analyze', methods=['POST'])
 def analyze_image():
     try:
-        # Check if the image is sent as base64
-        if 'image' in request.json:
-            base64_image = request.json['image']
-            image_data = base64.b64decode(base64_image.split(',')[1])
-            img = Image.open(io.BytesIO(image_data))
-        # Check if the image is sent as a file
-        elif 'image' in request.files:
-            file = request.files['image']
-            img = Image.open(file.stream)
+        if request.content_type.startswith('multipart/form-data'):
+            # Check if the image is sent as a file
+            if 'image' in request.files:
+                file = request.files['image']
+                img = Image.open(file.stream)
+            else:
+                return jsonify({'error': 'No image provided'}), 400
         else:
-            return jsonify({'error': 'No image provided'}), 400
+            # Check if the image is sent as base64 JSON
+            if 'image' in request.json:
+                base64_image = request.json['image']
+                image_data = base64.b64decode(base64_image.split(',')[1])
+                img = Image.open(io.BytesIO(image_data))
+            else:
+                return jsonify({'error': 'No image provided'}), 400
 
         # Convert PIL Image to OpenCV format
+        logging.info("Converting image to OpenCV format")
         img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
         # Analyze the image
+        logging.info("Analyzing image")
         result = analyzer.analyze_image(img_cv)
 
         return jsonify(result)

@@ -1,19 +1,14 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-import subprocess
-import sys
 import re
 from collections import Counter, defaultdict
-import requests
-import json
 from azure.ai.vision.imageanalysis import ImageAnalysisClient
 from azure.ai.vision.imageanalysis.models import VisualFeatures
 from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError
 from transformers import AutoTokenizer, AutoModel
-
+import logging
 
 # def install_packages():
 #     packages = ["paddlepaddle", "paddleocr", "fuzzywuzzy", "python-Levenshtein", "easyocr", "dateparser", "transformers", "albumentations"]
@@ -494,9 +489,11 @@ class ImprovedComprehensiveImageAnalyzer:
             size_groups = self.text_extractor.extract_all_text(img_version)
             for texts in size_groups.values():
                 all_text.update(texts)
-
+        logging.info(f"Extracted text: {all_text}")
         _, buffer = cv2.imencode('.jpg', image)
         image_bytes = buffer.tobytes()
+
+        logging.info("Analyzing image with Azure AI vision")
         azure_result = self.azure_client.analyze(
             image_data=image_bytes,
             visual_features=[VisualFeatures.CAPTION, VisualFeatures.READ],
@@ -507,14 +504,16 @@ class ImprovedComprehensiveImageAnalyzer:
             for block in azure_result.read.blocks:
                 for line in block.lines:
                     all_text.add(line.text)
-
+        
+        logging.info("Extracting product information from azure results")
         product_info = self.structure_text_with_models(list(all_text))
         product_info['all_text'] = list(all_text)
 
         if azure_result.caption:
             product_info['Package Description'] = azure_result.caption.text
             product_info['Confidence'] = azure_result.caption.confidence
-
+        
+        logging.info("Extracting dominant colors using Image Processor Module")
         outlined_image, _ = ImageProcessor.outline_color_changes(image)
         dominant_colors = ImageProcessor.extract_dominant_colors(image)
 
@@ -541,6 +540,7 @@ class ImprovedComprehensiveImageAnalyzer:
             'all_text': ' '.join(text_list)
         }
 
+        logging.info("Extracting entities and classifying text using TinyBERT")
         for text in text_list:
 
             category = self.classify_text(text)
