@@ -21,6 +21,13 @@ import easyocr
 from paddleocr import PaddleOCR
 import dateparser
 
+import base64
+
+def convert_image_to_base64(image):
+    _, buffer = cv2.imencode('.jpg', image)  # Encode image as JPEG
+    image_base64 = base64.b64encode(buffer).decode('utf-8')  # Convert to base64 string
+    return image_base64
+
 product_categories = {
     'dairy': ['Ghee'],
     'grains': ['Atta', 'Rice'],
@@ -135,6 +142,8 @@ class TextExtractor:
             return []
 
     def extract_text_paddle(self, image):
+        if not image.flags['C_CONTIGUOUS']:
+            image = np.ascontiguousarray(image)
         result = self.paddle_ocr.ocr(image, cls=True)
         extracted_text = []
         if result is not None:
@@ -439,6 +448,8 @@ class ProductInfoExtractor:
 class ImageProcessor:
     @staticmethod
     def preprocess_image(image):
+        if not image.flags['C_CONTIGUOUS']:
+            image = np.ascontiguousarray(image)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         denoised = cv2.fastNlMeansDenoising(gray)
         sharpened = cv2.filter2D(denoised, -1, np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]))
@@ -519,7 +530,7 @@ class ImprovedComprehensiveImageAnalyzer:
 
         return {
             'product_info': product_info,
-            'outlined_image': outlined_image,
+            'outlined_image': convert_image_to_base64(outlined_image),
             'dominant_colors': dominant_colors,
         }
 
@@ -686,7 +697,7 @@ def process_images(folder_path, known_brands, product_categories, product_types,
 
             analysis_result = analyzer.analyze_image(image)
             analysis_result['filename'] = filename
-            analysis_result['original_image'] = image
+            analysis_result['original_image'] = convert_image_to_base64(image)  # Convert image to base64
             results.append(analysis_result)
 
     return results
