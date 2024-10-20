@@ -6,7 +6,6 @@ import base64
 from PIL import Image
 from werkzeug.utils import secure_filename
 from werkzeug.urls import url_quote
-from werkzeug.urls import quote as url_quote
 import numpy as np
 import cv2
 import logging
