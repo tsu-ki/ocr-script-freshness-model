@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document OCR API</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300&family=Nunito:wght@600&family=Roboto+Mono&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #fefeff;
+            font-family: 'Nunito', sans-serif;
+            color: #737c84;
+        }
+        
+        .container {
+            max-width: 1200px;
+            padding: 2rem;
+        }
+        
+        h1, h2, h3, h4 {
+            color: #101010;
+            font-family: 'Funnel Display', serif;
+        }
+        
+        .hero-section {
+            max-width: 50%;
+            margin-bottom: 3rem;
+        }
+        
+        .hero-title {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .hero-description {
+            font-size: 1.5rem;
+            line-height: 1.6;
+            color: #737c84;
+        }
+        
+        .cards-container {
+            display: flex;
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .card {
+            flex: 1;
+            border-radius: 20px;
+            padding: 2rem;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-guide {
+            background-color: #e1ccfe;  /* Changed color to purple theme */
+        }
+        
+        .card-examples {
+            background-color: #ccfee1;  /* Changed color to green theme */
+        }
+        
+        .code-block {
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 10px;
+            padding: 1rem;
+            position: relative;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 5px;
+            padding: 0.3rem 0.8rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background-color: #101010;
+            color: white;
+        }
+        
+        .accuracy-badge {
+            background-color: #101010;
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .cards-container {
+                flex-direction: column;
+            }
+            
+            .hero-section {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero-section">
+            <h1 class="hero-title">Document OCR API</h1>
+            <h3 class="hero-description">
+                Transform your document processing with our advanced OCR API. 
+                Leveraging Azure Vision and Tesseract, we offer comprehensive document analysis 
+                with <span class="accuracy-badge">high accuracy</span> text extraction, 
+                table detection, and signature recognition.
+            </h3>
+        </div>
+
+        <div class="cards-container">
+            <div class="card card-guide">
+                <h2>Quick Start Guide</h2>
+                <h5 class="mt-4">API Endpoints</h5>
+                <div class="code-block" id="endpoints-code">
+                    <pre>POST /process
+Content-Type: multipart/form-data
+
+file: [PDF/Image file]</pre>
+                    <button class="copy-btn" onclick="copyToClipboard('endpoints-code')">Copy</button>
+                </div>
+                <h5 class="mt-4">Response Format</h5>
+                <div class="code-block" id="response-code">
+                    <pre>{
+    "structured_info": {
+        "entities": {...},
+        "dates": [...],
+        "emails": [...],
+        "phones": [...],
+        "addresses": [...]
+    },
+    "tables": [...],
+    "signatures": [...],
+    "raw_text": "extracted text",
+    "image_base64": "base64_string"
+}</pre>
+                    <button class="copy-btn" onclick="copyToClipboard('response-code')">Copy</button>
+                </div>
+            </div>
+
+            <div class="card card-examples">
+                <h2>Code Examples</h2>
+                <h5 class="mt-4">Python</h5>
+                <div class="code-block" id="python-code">
+                    <pre>
+import requests
+
+files = {
+    'file': open('document.pdf', 'rb')
+}
+
+response = requests.post(
+    'http://your-api-endpoint/process',
+    files=files
+)
+
+result = response.json()
+print(f"Extracted Text: {result['raw_text']}")
+print(f"Found Tables: {len(result['tables'])}")
+print(f"Signatures Detected: {len(result['signatures'])}")</pre>
+                    <button class="copy-btn" onclick="copyToClipboard('python-code')">Copy</button>
+                </div>
+
+                <h5 class="mt-4">JavaScript</h5>
+                <div class="code-block" id="js-code">
+                    <pre>
+const formData = new FormData();
+formData.append('file', fileInput.files[0]);
+
+fetch('http://your-api-endpoint/process', {
+    method: 'POST',
+    body: formData
+})
+.then(response => response.json())
+.then(data => {
+    console.log('Extracted Text:', data.raw_text);
+    console.log('Tables:', data.tables);
+    console.log('Signatures:', data.signatures);
+});</pre>
+                    <button class="copy-btn" onclick="copyToClipboard('js-code')">Copy</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center mt-5">
+            <p>Powered by Azure Vision and Tesseract OCR</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = element.nextElementSibling;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
