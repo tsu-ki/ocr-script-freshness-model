@@ -46,71 +46,77 @@
             color: #737c84;
         }
         
-        .cards-container {
-            display: flex;
-            gap: 2rem;
-            margin-top: 3rem;
+        .upload-section {
+            margin: 3rem 0;
+            text-align: center;
         }
-        
-        .card {
-            flex: 1;
-            border-radius: 20px;
-            padding: 2rem;
+
+        .file-upload {
+            display: none;
+        }
+
+        .upload-btn {
+            background-color: #e1ccfe;
+            color: #101010;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
             border: none;
+        }
+
+        .upload-btn:hover {
+            background-color: #d0b8ed;
+            transform: translateY(-2px);
+        }
+
+        .results-section {
+            display: none;
+            margin-top: 2rem;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 20px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
-        .card-guide {
-            background-color: #e1ccfe;  /* Changed color to purple theme */
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
         }
-        
-        .card-examples {
-            background-color: #ccfee1;  /* Changed color to green theme */
-        }
-        
-        .code-block {
-            background-color: rgba(255, 255, 255, 0.7);
+
+        .result-card {
+            background-color: #f8f9fa;
+            padding: 1.5rem;
             border-radius: 10px;
-            padding: 1rem;
-            position: relative;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.9rem;
         }
-        
-        .copy-btn {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            background-color: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 5px;
-            padding: 0.3rem 0.8rem;
-            cursor: pointer;
-            font-size: 0.8rem;
-            transition: all 0.2s;
+
+        .loading {
+            display: none;
+            margin: 2rem 0;
         }
-        
-        .copy-btn:hover {
-            background-color: #101010;
-            color: white;
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #e1ccfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        
-        .accuracy-badge {
-            background-color: #101010;
-            color: white;
-            padding: 0.2rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.9rem;
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        
-        @media (max-width: 768px) {
-            .cards-container {
-                flex-direction: column;
-            }
-            
-            .hero-section {
-                max-width: 100%;
-            }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            margin: 1rem 0;
+            border-radius: 10px;
         }
     </style>
 </head>
@@ -126,76 +132,38 @@
             </h3>
         </div>
 
-        <div class="cards-container">
-            <div class="card card-guide">
-                <h2>Quick Start Guide</h2>
-                <h5 class="mt-4">API Endpoints</h5>
-                <div class="code-block" id="endpoints-code">
-                    <pre>POST /process
-Content-Type: multipart/form-data
-
-file: [PDF/Image file]</pre>
-                    <button class="copy-btn" onclick="copyToClipboard('endpoints-code')">Copy</button>
-                </div>
-                <h5 class="mt-4">Response Format</h5>
-                <div class="code-block" id="response-code">
-                    <pre>{
-    "structured_info": {
-        "entities": {...},
-        "dates": [...],
-        "emails": [...],
-        "phones": [...],
-        "addresses": [...]
-    },
-    "tables": [...],
-    "signatures": [...],
-    "raw_text": "extracted text",
-    "image_base64": "base64_string"
-}</pre>
-                    <button class="copy-btn" onclick="copyToClipboard('response-code')">Copy</button>
-                </div>
+        <!-- Add file upload section -->
+        <div class="upload-section">
+            <input type="file" id="fileUpload" class="file-upload" accept=".pdf,.jpg,.jpeg,.png,.tiff">
+            <label for="fileUpload" class="upload-btn">
+                Upload Document
+            </label>
+            <div id="loading" class="loading">
+                <div class="loading-spinner"></div>
+                <p>Processing document...</p>
             </div>
+        </div>
 
-            <div class="card card-examples">
-                <h2>Code Examples</h2>
-                <h5 class="mt-4">Python</h5>
-                <div class="code-block" id="python-code">
-                    <pre>
-import requests
-
-files = {
-    'file': open('document.pdf', 'rb')
-}
-
-response = requests.post(
-    'http://your-api-endpoint/process',
-    files=files
-)
-
-result = response.json()
-print(f"Extracted Text: {result['raw_text']}")
-print(f"Found Tables: {len(result['tables'])}")
-print(f"Signatures Detected: {len(result['signatures'])}")</pre>
-                    <button class="copy-btn" onclick="copyToClipboard('python-code')">Copy</button>
+        <!-- Add results section -->
+        <div id="results" class="results-section">
+            <h2>Results</h2>
+            <div id="imagePreview"></div>
+            <div class="results-grid">
+                <div class="result-card">
+                    <h4>Extracted Text</h4>
+                    <pre id="extractedText" style="white-space: pre-wrap;"></pre>
                 </div>
-
-                <h5 class="mt-4">JavaScript</h5>
-                <div class="code-block" id="js-code">
-                    <pre>
-const formData = new FormData();
-formData.append('file', fileInput.files[0]);
-
-fetch('http://your-api-endpoint/process', {
-    method: 'POST',
-    body: formData
-})
-.then(response => response.json())
-.then(data => {
-    console.log('Extracted Text:', data.raw_text);
-    console.log('Tables:', data.tables);
-    console.log('Signatures:', data.signatures);
-});</pre>
-                    <button class="copy-btn" onclick="copyToClipboard('js-code')">Copy</button>
+                <div class="result-card">
+                    <h4>Detected Tables</h4>
+                    <div id="detectedTables"></div>
+                </div>
+                <div class="result-card">
+                    <h4>Detected Signatures</h4>
+                    <div id="detectedSignatures"></div>
+                </div>
+                <div class="result-card">
+                    <h4>Structured Information</h4>
+                    <div id="structuredInfo"></div>
                 </div>
             </div>
         </div>
@@ -206,20 +174,106 @@ fetch('http://your-api-endpoint/process', {
     </div>
 
     <!-- Scripts -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-        function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            const text = element.innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = element.nextElementSibling;
-                btn.textContent = 'Copied!';
-                setTimeout(() => {
-                    btn.textContent = 'Copy';
-                }, 2000);
-            });
+        document.getElementById('fileUpload').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Show loading spinner
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+
+            // Create FormData
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Send file to server
+                const response = await fetch('http://your-api-endpoint/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                // Hide loading spinner
+                document.getElementById('loading').style.display = 'none';
+
+                // Show results section
+                document.getElementById('results').style.display = 'block';
+
+                // Display image preview if available
+                if (data.image_base64) {
+                    const img = document.createElement('img');
+                    img.src = `data:image/jpeg;base64,${data.image_base64}`;
+                    img.className = 'preview-image';
+                    document.getElementById('imagePreview').innerHTML = '';
+                    document.getElementById('imagePreview').appendChild(img);
+                }
+
+                // Display extracted text
+                document.getElementById('extractedText').textContent = data.raw_text || 'No text extracted';
+
+                // Display tables
+                const tablesDiv = document.getElementById('detectedTables');
+                tablesDiv.innerHTML = data.tables?.length 
+                    ? `Found ${data.tables.length} tables` 
+                    : 'No tables detected';
+
+                // Display signatures
+                const signaturesDiv = document.getElementById('detectedSignatures');
+                signaturesDiv.innerHTML = data.signatures?.length 
+                    ? `Found ${data.signatures.length} signatures` 
+                    : 'No signatures detected';
+
+                // Display structured information
+                const structuredInfoDiv = document.getElementById('structuredInfo');
+                structuredInfoDiv.innerHTML = '<pre>' + 
+                    JSON.stringify(data.structured_info, null, 2) + 
+                    '</pre>';
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('Error processing document. Please try again.');
+            }
+        });
+
+        // Add drag and drop functionality
+        const uploadSection = document.querySelector('.upload-section');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadSection.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            uploadSection.classList.add('highlight');
+        }
+
+        function unhighlight(e) {
+            uploadSection.classList.remove('highlight');
+        }
+
+        uploadSection.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            document.getElementById('fileUpload').files = files;
+            document.getElementById('fileUpload').dispatchEvent(new Event('change'));
         }
     </script>
 </body>
