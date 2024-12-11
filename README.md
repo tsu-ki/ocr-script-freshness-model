@@ -1,5 +1,5 @@
 # Critiscan's OCR Product Detection Model
-
+![image](https://github.com/user-attachments/assets/42c10f9f-065d-4fd4-a6db-8e02e5ce13fa)
 
 ## Flipkart Robotics Challenge Hackathon Submission
 
