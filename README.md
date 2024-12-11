@@ -65,7 +65,12 @@ A sophisticated multi-model detection system designed to extract detailed inform
 #### **Installation**
 
 ```
-`# Clone the repository git clone https://github.com/your-repo/ocr-detection-model.git # Change directory cd ocr-detection-model # Install dependencies pip install -r requirements.txt # Run the application python app.py`
+`# Clone the repository
+        git clone https://github.com/tsu-ki/ocr-script-freshness-model
+# Install dependencies
+        pip install -r requirements.txt
+# Run the application
+        python app.py`
 ```
 ---
 ## _Deployment_
