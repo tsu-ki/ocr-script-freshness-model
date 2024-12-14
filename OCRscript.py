@@ -3,10 +3,6 @@ import numpy as np
 import os
 import re
 from collections import Counter, defaultdict
-from azure.ai.vision.imageanalysis import ImageAnalysisClient
-from azure.ai.vision.imageanalysis.models import VisualFeatures
-from azure.core.credentials import AzureKeyCredential
-from azure.core.exceptions import HttpResponseError
 from transformers import AutoTokenizer, AutoModel
 import logging
 
