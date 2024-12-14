@@ -8,6 +8,8 @@
 A sophisticated multi-model detection system designed to extract detailed information from product images using advanced computer vision and machine learning techniques. This integrated detection solution combines multiple state-of-the-art models to provide comprehensive product analysis.
 - [Link to Website Repository](https://github.com/aanushkaguptaa/critiscan)
 - [Link to Fruit Quality Assessment Model](https://github.com/tsu-ki/Freshness-model)
+- [Link to Item Counting and Brand Detection](https://github.com/tsu-ki/FMCGDetectron)
+
 ## _Key Features_
 
 - **Multi-Model Integration**: Combines YOLO, Detectron2, and custom deep learning models
