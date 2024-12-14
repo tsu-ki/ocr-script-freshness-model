@@ -43,8 +43,6 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Initialize your analyzer
-azure_endpoint = "https://ocr-testing-10.cognitiveservices.azure.com/"
-azure_key = "d3893ea029aa4d52863a23d9bbce11d8"
 known_brands = [
         "Cannot Detect", "Fortune", "Dabur", "Colgate", "Maggi", "Surf Excel", "Amul",
         "Parle", "Sunfeast", "Good Day", "Marie Gold", "Lays", "Kurkure", "Bingo", "Haldirams",
