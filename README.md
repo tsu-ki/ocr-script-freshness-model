@@ -1,95 +1,130 @@
-# Critiscan's OCR Product Detection Model
+# Critiscan's OCR Text Extraction Model
 ![image](https://github.com/user-attachments/assets/42c10f9f-065d-4fd4-a6db-8e02e5ce13fa)
 
 ## Flipkart Grid Hackathon Robotics Track Submission - Team sendittokrishnaa
 
 ## _Overview_
 
-A sophisticated multi-model detection system designed to extract detailed information from product images using advanced computer vision and machine learning techniques. This integrated detection solution combines multiple state-of-the-art models to provide comprehensive product analysis.
+This repository contains the OCR-based text extraction model designed to read and interpret text from images. The model employs techniques for optical character recognition (OCR) and integrates multiple libraries to enhance accuracy and versatility. It has been optimized for extracting key product details such as brand, expiry date, and pricing information.
 - [Link to Website Repository](https://github.com/aanushkaguptaa/critiscan)
 - [Link to Fruit Quality Assessment Model](https://github.com/tsu-ki/Freshness-model)
 - [Link to Item Counting and Brand Detection](https://github.com/tsu-ki/FMCGDetectron)
 
 ## _Key Features_
 
-- **Multi-Model Integration**: Combines YOLO, Detectron2, and custom deep learning models
-- **Object Detection**: Identifies and counts multiple objects in a single frame
-- **Brand Recognition**: Intelligent brand detection using custom trained models
-- **Real-time Processing**: Optimized for live video stream analysis
-- **Comprehensive Logging**: Detailed error tracking and performance monitoring
+- **Multi-OCR Integration**: Combines PaddleOCR and EasyOCR for robust text extraction.
+- **Advanced Text Parsing**: Uses a pre-trained large language model (LLM) to interpret and structure extracted text.
+- **Real-time Processing**: Optimized for quick and efficient processing of images.
+- **Flask API**: Provides a RESTful endpoint for text extraction and information parsing.
+
 ---
+
 ## _Technical Architecture_
 
-#### **1. Model Components**
+### **1. Core Components**
 
-- **Object Detection**:
-    - YOLO v8 for rapid object identification
-    - Detectron2 Instance Segmentation for detailed object analysis
-- **Brand Recognition**: Custom Keras-based classification model
-- **Multimodal Analysis**: Qwen2 VL multimodal model for advanced image understanding
+- **OCR Frameworks**:
+    - PaddleOCR for angle-sensitive text detection.
+    - EasyOCR for multilingual text extraction.
+- **Language Model Integration**:
+    - Pre-trained LLM (Qwen1.5-1.8B-Chat) for structured information extraction.
 
-#### **2. Technical Specifications**
+### **2. Technical Specifications**
 
-| Component             | Specification         |
-| --------------------- | --------------------- |
-| Object Detection      | YOLO v8               |
-| Instance Segmentation | Detectron2 Mask R-CNN |
-| Brand Detection       | Custom Keras Model    |
-| Multimodal Model      | Qwen2 VL-2B-Instruct  |
-| Processing Framework  | Flask                 |
-| Deployment            | Docker + AWS EC2      |
+| Component            | Specification      |
+| -------------------- | ------------------ |
+| OCR Libraries        | PaddleOCR, EasyOCR |
+| Language Model       | Qwen1.5-1.8B-Chat  |
+| Processing Framework | Flask              |
+| Deployment           | Docker + AWS EC2   |
 
-#### **3. Key Processing Capabilities**
+### **3. Key Processing Capabilities**
 
-- Real-time video frame processing
-- Adaptive frame skipping for performance optimization
-- Multi-source object detection
-- Automatic brand recognition
-- Excel export of detection results
+- Simultaneous use of multiple OCR libraries for high accuracy.
+- Structured output in JSON format with details such as brand, MRP, expiry date, etc.
+- Error handling for invalid inputs and edge cases.
 
 ---
+
 ## _Performance Metrics_
 
-- **Adaptive Frame Processing**: Processes every 2nd frame
-- **Resolution**: Optimized to 640x480 for efficient processing
-- **Object Detection Sources**:
-    - YOLO Object Detection
-    - Detectron2 Instance Segmentation
-- **Logging**: Comprehensive error tracking and system monitoring
+- **Accuracy**: Combines multiple OCR outputs to minimize errors.
+- **Output Format**: Provides structured JSON output for ease of integration.
+- **Scalability**: Tested on cloud platforms for reliable performance.
+
 ---
+
 ## _Getting Started_
 
-#### **Prerequisites**
+### **Prerequisites**
 
 - Python 3.8+
 - CUDA-capable GPU (recommended)
 - Docker (optional)
-#### **Installation**
+
+### **Installation**
 
 ```
-`# Clone the repository
-        git clone https://github.com/tsu-ki/ocr-script-freshness-model
+# Clone the repository
+git clone https://github.com/tsu-ki/ocr-script
+
 # Install dependencies
-        pip install -r requirements.txt
+pip install -r requirements.txt
+
 # Run the application
-        python app.py`
+python app.py
 ```
+
 ---
+
+## _API Usage_
+
+**Endpoint**: `/extract_text`
+
+- **Method**: `GET`
+- **Parameters**:
+    - `image_path`: Path to the image file.
+
+**Example Usage**:
+```
+http://0.0.0.0:8080/extract_text?image_path=/path/to/image.jpg
+```
+
+**Sample JSON Output**:
+```
+{
+  "product_details": {
+    "Brand": "Example Brand",
+    "Expiry Date": "Best Before 12/2025",
+    "MRP": "10.00",
+    "Net Weight": "500g",
+    "Manufacturer": "Example Manufacturer",
+    "Storage Conditions": "Keep in a cool, dry place"
+  }
+}
+```
+
+---
+
 ## _Deployment_
 
 - **Web Framework**: Flask
 - **Containerization**: Docker
 - **Cloud Platform**: AWS EC2
-- **Streaming**: Real-time video feed with object detection
+
+---
 
 ## _Future Development Roadmap_
 
-- Expand object recognition capabilities
-- Improve brand detection accuracy
-- Optimize processing speed
-- Develop more sophisticated multimodal analysis
+- Enhance multilingual text extraction capabilities.
+- Expand text parsing to include additional product details.
+- Integrate more OCR libraries for specialized use cases.
+
 ---
+
 ## _References_
 
-- [Detectron2 Documentation](https://detectron2.readthedocs.io/en/latest/)
-- [Qwen2-VL Repo](https://github.com/QwenLM/Qwen2-VL)
+- [PaddleOCR Documentation](https://github.com/PaddlePaddle/PaddleOCR)
+- [EasyOCR Documentation](https://github.com/JaidedAI/EasyOCR)
+- [Qwen1.5-1.8B-Chat Model](https://github.com/QwenLM/Qwen1.5-Chat)
+- [FMCGDetectron Repository](https://github.com/tsu-ki/FMCGDetectron)
