@@ -1,152 +1,279 @@
-# app.py
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import io
-import base64
-from PIL import Image
-# from werkzeug.utils import secure_filename
-# from werkzeug.urls import url_quote
-import numpy as np
-import cv2
-import logging
 import os
-from OCRscript import ImprovedComprehensiveImageAnalyzer
-# from improved_comprehensive_image_analyzer import ImprovedComprehensiveImageAnalyzer
-import base64
+import threading
+import json
+import psutil
+import traceback
+import time
+
+from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
+
+from paddleocr import PaddleOCR
+from easyocr import Reader
 import cv2
 import numpy as np
 
-def convert_image_to_base64(image):
-    """Convert an OpenCV image (ndarray) to a base64 string."""
-    _, buffer = cv2.imencode('.jpg', image)  # Encode image as JPEG
-    image_base64 = base64.b64encode(buffer).decode('utf-8')  # Convert to base64 string
-    return image_base64
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from fuzzywuzzy import process
 
-def ensure_json_serializable(data):
-    """
-    Recursively check a dictionary or list and convert non-serializable
-    objects like NumPy arrays to serializable formats (e.g., base64 for images).
-    """
-    if isinstance(data, dict):
-        # If data is a dictionary, check each key-value pair
-        for key, value in data.items():
-            data[key] = ensure_json_serializable(value)
-    elif isinstance(data, list):
-        # If data is a list, check each item
-        data = [ensure_json_serializable(item) for item in data]
-    elif isinstance(data, np.ndarray):
-        # If data is a NumPy array (likely an image), convert to base64
-        return convert_image_to_base64(data)
-    return data
-
+# Initialize Flask app
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)  # Enable CORS for all routes
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max file size
 
-# Initialize your analyzer
-known_brands = [
-        "Cannot Detect", "Fortune", "Dabur", "Colgate", "Maggi", "Surf Excel", "Amul",
-        "Parle", "Sunfeast", "Good Day", "Marie Gold", "Lays", "Kurkure", "Bingo", "Haldirams",
-        "Tata", "Britannia", "Haldiram's", "Mother Dairy", "Patanjali", "Nestlé",
-        "ITC", "Hindustan Unilever", "Godrej", "Bisleri", "Cadbury", "Vicco", "Nestle",
-        "Frooti", "Kissan", "MTR", "Lijjat", "Nirma", "Boroline", "Everest",
-        "MDH", "Bournvita", "Hajmola", "Lifebuoy", "Clinic Plus", "Parachute",
-        "Fevicol", "Pidilite", "Santoor", "Vim", "Saffola", "Trust",
-        "Mondelez", "Ananda", "AASHIRVAAD",  "Uncle Chips", "Madhur", "Uttam",
-        "Tata Tea", "Lipton", "Red Label", "Ariel", "Tide", "Dove", "Lux", "Pantene", "Head & Shoulders"
-    ]
-product_categories = {
-    'dairy': ['Ghee'],
-    'grains': ['Atta', 'Rice'],
-    'sweeteners': ['Sugar'],
-    'snacks': ['Biscuit', 'Namkeen'],
-    'beverages': ['Tea', 'Cold Drinks'],
-    'oils': ['Sunflower Oil', 'Mustard Oil', 'Groundnut Oil', 'Olive Oil'],
-    'personal_care': ['Soap', 'Face Wash', 'Shampoo', 'Toothpaste', 'Toothbrush', 'Shaving Cream', 'Hair Oil'],
-    'cleaning': ['Detergent'],
-    'lentils': ['Dal', 'Toor Dal', 'Moong Dal', 'Chana Dal'],
-    'dry_fruits_nuts': ['Dry Fruits', 'Almonds', 'Cashew Nuts', 'Dates & Raisins'],
-    'pasta': ['Noodles', 'Pasta'],
-    'confectionery': ['Chocolates', 'Sweets & Mithai'],
-}
+# Text extraction class
+class TextExtractor:
+    def __init__(self, confidence_threshold=0.5):
+        self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
+        self.easyocr_reader = Reader(['en'])
+        self.confidence_threshold = confidence_threshold
 
-product_types = {
-    'biscuits': ['biscuit', 'cookie', 'cracker', 'wafer'],
-    'chips': ['chips', 'crisps', 'wafers', 'nachos'],
-    'flour': ['atta', 'flour', 'multigrain'],
-    'ghee': ['ghee', 'clarified butter'],
-    'rice': ['basmati', 'long grain', 'brown rice', 'white rice'],
-    'sugar': ['granulated', 'powdered', 'brown sugar'],
-    'tea': ['black tea', 'green tea', 'herbal tea'],
-    'cold_drinks': ['soda', 'cola', 'lemonade', 'fruit juice'],
-    'oils': ['cooking oil', 'vegetable oil', 'olive oil', 'mustard oil'],
-    'personal_care': ['soap', 'shampoo', 'toothpaste', 'face wash', 'shaving cream'],
-    'detergents': ['powder detergent', 'liquid detergent', 'fabric softener'],
-    'lentils': ['dal', 'pulses', 'legumes'],
-    'dry_fruits_nuts': ['almonds', 'cashews', 'raisins', 'dates'],
-    'noodles': ['instant noodles', 'pasta', 'spaghetti'],
-    'chocolates': ['milk chocolate', 'dark chocolate', 'white chocolate'],
-}
+    def extract_text(self, image):
+        try:
+            if isinstance(image, bytes):
+                # Convert bytes to numpy array for OpenCV
+                nparr = np.frombuffer(image, np.uint8)
+                image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if image is None:
+                raise ValueError("Could not read image")
+            
+            paddle_results = self.paddle_ocr.ocr(image, cls=True) or []
+            paddle_text = [
+                text[1][0]
+                for line in paddle_results for text in line
+                if len(text) > 1 and text[1][1] > self.confidence_threshold
+            ]
+            easyocr_results = self.easyocr_reader.readtext(image) or []
+            easyocr_text = [
+                text[1]
+                for text in easyocr_results
+                if text[2] > self.confidence_threshold
+            ]
+            return list(set(paddle_text + easyocr_text))
+        except Exception as e:
+            print(f"Error: {e}")
+            traceback.print_exc()
+            return []
 
-# analyzer = ImprovedComprehensiveImageAnalyzer(known_brands, product_categories, product_types, azure_key, azure_endpoint)
-# Initialize the analyzer with your configurations
-analyzer = ImprovedComprehensiveImageAnalyzer(
-    known_brands=known_brands,
-    product_categories=product_categories,
-    product_types = product_types,
-    azure_key= azure_key,
-    azure_endpoint= azure_endpoint
-)
+# LLM Setup with caching
+class LLMCache:
+    _instance = None
+    
+    def __new__(cls):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+            cls._device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            cls._tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-1.8B-Chat", trust_remote_code=True)
+            cls._model = AutoModelForCausalLM.from_pretrained(
+                "Qwen/Qwen1.5-1.8B-Chat",
+                torch_dtype=torch.float16,  
+                trust_remote_code=True
+            )
+            cls._model.to(cls._device)
+        return cls._instance
+    
+    def generate_product_details(self, input_text):
+        try:
+            inputs = self._tokenizer(input_text, return_tensors="pt").to(self._device)
+            outputs = self._model.generate(
+                **inputs, 
+                max_length=3700, 
+                num_return_sequences=1, 
+                temperature=0.7
+            )
+            result_text = self._tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Attempt to parse the result as JSON
+            try:
+                parsed_details = json.loads(result_text)
+                return parsed_details
+            except (json.JSONDecodeError, ValueError):
+                return {"raw_text": result_text}
+        except Exception as e:
+            print(f"LLM Generation Error: {e}")
+            return {"error": str(e)}
 
-@app.route('/analyze', methods=['POST'])
-def analyze_image():
+# Health Check and Testing Route
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Comprehensive health check endpoint to verify system components
+    """
+    health_status = {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "system_checks": {
+            "ocr_engines": {
+                "paddleocr": False,
+                "easyocr": False
+            },
+            "llm_model": {
+                "loaded": False,
+                "device": str(torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
+            },
+            "system_resources": {}
+        },
+        "test_results": {}
+    }
+
     try:
-        logging.info(f"Request Content-Type: {request.content_type}")
-        logging.info(f"Request files: {request.files}")
-        # Check if the image is sent as a base64 string in JSON
-        if request.content_type == 'application/json' and 'image' in request.json:
-            base64_image = request.json['image']
-            logging.info(f"Received image file: {file.filename}")
-            image_data = base64.b64decode(base64_image.split(',')[1])
-            img = Image.open(io.BytesIO(image_data))
-        # Check if the image is sent as a file (multipart/form-data)
-        elif 'image' in request.files:
-            file = request.files['image']
-            img = Image.open(file.stream)
+        # Check OCR Engines
+        test_image = np.zeros((100, 100, 3), dtype=np.uint8)
+        
+        # PaddleOCR Test
+        try:
+            paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
+            paddle_results = paddle_ocr.ocr(test_image, cls=True)
+            health_status["system_checks"]["ocr_engines"]["paddleocr"] = True
+        except Exception as e:
+            health_status["system_checks"]["ocr_engines"]["paddleocr_error"] = str(e)
+        
+        # EasyOCR Test
+        try:
+            easyocr_reader = Reader(['en'])
+            easyocr_results = easyocr_reader.readtext(test_image)
+            health_status["system_checks"]["ocr_engines"]["easyocr"] = True
+        except Exception as e:
+            health_status["system_checks"]["ocr_engines"]["easyocr_error"] = str(e)
+        
+        # LLM Model Check
+        try:
+            llm_cache = LLMCache()
+            test_prompt = "Perform a system check."
+            test_generation = llm_cache.generate_product_details(test_prompt)
+            health_status["system_checks"]["llm_model"]["loaded"] = True
+            health_status["system_checks"]["llm_model"]["test_generation"] = bool(test_generation)
+        except Exception as e:
+            health_status["system_checks"]["llm_model"]["error"] = str(e)
+        
+        # System Resources
+        try:
+            health_status["system_checks"]["system_resources"] = {
+                "cpu_count": os.cpu_count(),
+                "available_memory": f"{psutil.virtual_memory().available / (1024*1024*1024):.2f} GB",
+                "cuda_available": torch.cuda.is_available(),
+                "cuda_device_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A"
+            }
+        except Exception as e:
+            health_status["system_checks"]["system_resources_error"] = str(e)
+        
+        # Simulated Test Scenarios
+        test_scenarios = [
+            {
+                "name": "Basic Text Extraction",
+                "input": "Brand: TestBrand\nWeight: 500g\nMRP: ₹99.99",
+                "expected": ["Brand", "Weight", "MRP"]
+            }
+        ]
+        
+        health_status["test_results"]["scenarios"] = []
+        
+        for scenario in test_scenarios:
+            result = {
+                "name": scenario["name"],
+                "passed": False
+            }
+            
+            try:
+                test_input = scenario["input"]
+                test_llm_input = f"""Extract product information:
+Text: {test_input}
+Extract details."""
+                
+                llm_cache = LLMCache()
+                generation_result = llm_cache.generate_product_details(test_llm_input)
+                
+                # Basic validation
+                result["passed"] = all(
+                    any(keyword in str(generation_result).lower() for keyword in scenario["expected"])
+                )
+                result["output"] = generation_result
+            except Exception as e:
+                result["error"] = str(e)
+            
+            health_status["test_results"]["scenarios"].append(result)
+        
+        # Overall Status
+        health_status["status"] = "healthy" if all([
+            health_status["system_checks"]["ocr_engines"]["paddleocr"],
+            health_status["system_checks"]["ocr_engines"]["easyocr"],
+            health_status["system_checks"]["llm_model"]["loaded"]
+        ]) else "degraded"
+        
+        return jsonify(health_status), 200
+    
+    except Exception as e:
+        health_status["status"] = "error"
+        health_status["error"] = str(e)
+        return jsonify(health_status), 500
+
+# Define endpoint for file upload
+@app.route('/extract_text', methods=['POST'])
+def extract_text_endpoint():
+    # Check if the post request has the file part
+    if 'file' not in request.files:
+        return jsonify({"message": "No file part"}), 400
+    
+    file = request.files['file']
+    
+    # If no file is selected, browser also submit an empty part without filename
+    if file.filename == '':
+        return jsonify({"message": "No selected file"}), 400
+    
+    # Read the image file
+    file_bytes = file.read()
+    
+    try:
+        # Extract text
+        extractor = TextExtractor()
+        extracted_text = extractor.extract_text(file_bytes)
+        
+        if extracted_text:
+            # Generate product details using LLM
+            llm_cache = LLMCache()
+            input_for_llm = f""" Extract detailed product information from the following text:
+
+Text: {' '.join(extracted_text)}
+Please extract the following details:
+- Brand
+- Expiry Date (if exact date is not given see for best before )
+- MRP (it can be structured as MRP10.00 where 10 is mrp )
+- Net Weight
+- Manufacturer
+- Storage Conditions
+Provide a structured response strictly in json format 
+about the above details.
+ 
+"""
+            product_details = llm_cache.generate_product_details(input_for_llm)
+            return jsonify({
+                "extracted_text": extracted_text,
+                "product_details": product_details
+            }), 200
         else:
-            return jsonify({'error': 'No image provided'}), 400
-
-        # Convert PIL Image to OpenCV format
-        logging.info("Converting image to OpenCV format")
-        img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-
-        # Analyze the image
-        logging.info("Analyzing image")
-        result = analyzer.analyze_image(img_cv)
-        
-        result_serializable = ensure_json_serializable(result)
-        
-        return jsonify(result_serializable)
-        # return jsonify(result)
-
+            return jsonify({"message": "No text extracted from the image."}), 200
+    
     except Exception as e:
-        logging.error(f"Error processing image: {str(e)}")
-        return jsonify({'error': 'Error processing image'}), 500
+        return jsonify({"message": f"Error processing image: {str(e)}"}), 500
 
+# Simple HTML upload form for testing
 @app.route('/', methods=['GET'])
-def test():
-    return jsonify({'message': 'API is working'}), 200
+def upload_form():
+    return '''
+    <!doctype html>
+    <title>Upload Product Image</title>
+    <h1>Upload Product Image for Text Extraction</h1>
+    <form method=post enctype=multipart/form-data action="/extract_text">
+      <input type=file name=file>
+      <input type=submit value=Upload>
+    </form>
+    <h2>System Health</h2>
+    <p><a href="/health">Check System Health</a></p>
+    '''
 
-def run_app():
-    try:
-        # Set up ngrok
-        # public_url = ngrok.connect(5000)
-        # print(f"Public URL: {public_url}")
-
-        # Run the app on all available interfaces
-        app.run(host='0.0.0.0', port=5000)
-    except Exception as e:
-        logging.error(f"Error starting the Flask app: {str(e)}")
-
-
+# Run the server
 if __name__ == '__main__':
-    run_app()
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5500, debug=False, use_reloader=False)).start()

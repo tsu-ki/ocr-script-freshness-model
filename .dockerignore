@@ -1,0 +1,21 @@
+# Ignore Python cache and temporary files
+__pycache__/
+easyocr/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.python-version
+venv/
+.env/
+.DS_Store
+Thumbs.db
+.git/
+.gitignore
+tests/
+*.spec
+*.test.*
+.idea/
+.vscode/
+*.swp
+*.swo
